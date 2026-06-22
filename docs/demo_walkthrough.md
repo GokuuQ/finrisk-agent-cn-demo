@@ -1,18 +1,18 @@
-# Demo Walkthrough
+# 演示流程
 
-This walkthrough is written for reviewers who want to understand the demo without reading the code first.
+本文档面向评审或浏览项目的人，帮助快速理解演示项目的完整能力。
 
-## 1. What To Look For
+## 1. 重点看什么
 
-The demo is not a generic chatbot. It is a constrained financial data analysis agent:
+本项目不是普通聊天机器人，而是一个受约束的金融风控数据分析智能体：
 
-- It works on a local synthetic credit database.
-- It converts natural language questions into structured analysis plans.
-- It validates SQL before execution.
-- It produces risk analysis reports with explicit metrics and segments.
-- It can run in a closed environment with a local Chinese open-weight model, or in fallback mode without a model.
+- 数据只来自本地合成信贷数据库。
+- 自然语言问题会被转换为结构化分析计划。
+- SQL 执行前会经过只读安全校验。
+- 输出不仅包含风险报告，还包含风控规则挖掘和策略候选方案。
+- 可接入本地国产开源模型，也可以在无模型环境下用内置模板跑通演示。
 
-## 2. Start The Demo
+## 2. 启动演示
 
 ```bash
 python -m venv .venv
@@ -22,68 +22,94 @@ python scripts/generate_demo_data.py
 streamlit run app.py
 ```
 
-Open the Streamlit URL and choose one of the preset questions.
+打开本地演示页面后，选择左侧预设问题并点击“运行分析”。
 
-## 3. Suggested Review Flow
+## 3. 建议演示顺序
 
-### Scenario A: Delinquency Trend
+### 场景一：风险趋势分析
 
-Question:
+问题：
 
 ```text
 分析近6个月M1/M2逾期率变化，并定位主要风险上升客群
 ```
 
-Expected behavior:
+预期表现：
 
-- The agent builds a MOB3 delinquency analysis.
-- It groups by month, channel, risk grade, and product type.
-- It reports the highest-risk segment and whether the trend rises or falls.
+- 智能体构建 MOB3 M1/M2 逾期分析。
+- 按月份、渠道、风险等级、产品类型分组。
+- 找出最高风险分组，并给出趋势变化和建议动作。
 
-### Scenario B: Strategy Impact
+### 场景二：风控规则挖掘
 
-Question:
+问题：
+
+```text
+挖掘高风险风控规则，按风险提升倍数排序并给出候选规则
+```
+
+预期表现：
+
+- 智能体按渠道、风险等级、产品类型、城市等级、收入带构造候选分群。
+- 计算每个候选规则的样本量、MOB3 M1/M2 逾期率、余额和风险提升倍数。
+- 输出可进入策略沙盘的高风险规则，而不是直接给出生产规则。
+
+### 场景三：策略开发
+
+问题：
+
+```text
+基于近期表现开发准入与额度策略候选方案，输出命中量、风险和建议动作
+```
+
+预期表现：
+
+- 智能体生成准入收紧、额度下调、人工复核等候选策略。
+- 每条策略输出命中申请量、当前通过率、放款量、MOB3 M1/M2、余额、净收入和已批核敞口。
+- 报告会说明上线前需要离线回测、灰度实验和回滚条件。
+
+### 场景四：策略效果评估
+
+问题：
 
 ```text
 评估2025年7月额度策略调整前后的通过率、M1逾期率和收益变化
 ```
 
-Expected behavior:
+预期表现：
 
-- The agent compares the period before and after the July 2025 policy event.
-- It avoids duplicated application counts by aggregating at application level before period-level aggregation.
-- It reports approval rate, booking rate, MOB3 M1 rate, balance, and net income.
+- 智能体对比 2025 年 7 月额度策略事件前后表现。
+- 先在申请粒度聚合，再做策略前后对比，避免月度表现表 join 导致申请量重复。
+- 输出通过率、放款率、MOB3 M1、余额和净收入。
 
-### Scenario C: Risk Daily Report
+### 场景五：风险日报
 
-Question:
+问题：
 
 ```text
 生成最近一个月风险日报，说明核心指标、异常波动和建议动作
 ```
 
-Expected behavior:
+预期表现：
 
-- The agent produces a current-month risk summary.
-- It applies a minimum sample-size filter to avoid over-interpreting tiny groups.
-- It identifies the top risk segment and provides monitoring suggestions.
+- 智能体生成最近月份风险摘要。
+- 对渠道和风险等级做拆解，并设置最低样本量门槛。
+- 输出最高风险分组和监控建议。
 
-## 4. Closed-Environment Controls
+## 4. 封闭环境控制点
 
-The demo includes these controls to mimic a private financial analytics environment:
-
-| Control | Implementation |
+| 控制点 | 实现方式 |
 | --- | --- |
-| Local data only | `scripts/generate_demo_data.py` creates `data/finrisk_demo.sqlite` |
-| Read-only SQL | `finrisk_agent/sql_tools.py` blocks mutation statements |
-| Table whitelist | Schema is limited to synthetic demo tables |
-| Local LLM endpoint | `finrisk_agent/llm.py` calls an OpenAI-compatible local endpoint |
-| Fallback mode | `finrisk_agent/planner.py` contains deterministic templates |
+| 本地数据 | `scripts/generate_demo_data.py` 生成 `data/finrisk_demo.sqlite` |
+| 只读 SQL | `finrisk_agent/sql_tools.py` 阻断写入、删除、建表等语句 |
+| 表范围受控 | schema 仅暴露合成演示表 |
+| 本地模型 | `finrisk_agent/llm.py` 调用本地兼容 OpenAI 接口的模型服务 |
+| 无模型可运行 | `finrisk_agent/planner.py` 提供内置任务模板 |
 
-## 5. What Is Intentionally Out Of Scope
+## 5. 不包含的内容
 
-- No real customer data
-- No real underwriting strategy
-- No production credit decisioning
-- No regulatory advice
-- No online search or external data dependency during analysis
+- 不包含真实客户数据
+- 不包含真实授信策略
+- 不包含生产决策逻辑
+- 不提供监管或投资建议
+- 分析过程中不依赖联网搜索或外部数据源

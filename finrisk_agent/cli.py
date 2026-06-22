@@ -8,11 +8,11 @@ from finrisk_agent.config import load_config
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the FinRisk Agent CN demo.")
-    parser.add_argument("question", help="Natural language risk analysis question.")
-    parser.add_argument("--config", default="config.yaml", help="Path to config yaml.")
-    parser.add_argument("--show-sql", action="store_true", help="Print generated SQL.")
-    parser.add_argument("--json", action="store_true", help="Print machine-readable output.")
+    parser = argparse.ArgumentParser(description="运行消费金融风控分析智能体演示项目。")
+    parser.add_argument("question", help="自然语言风控分析问题。")
+    parser.add_argument("--config", default="config.yaml", help="配置文件路径。")
+    parser.add_argument("--show-sql", action="store_true", help="打印生成的 SQL。")
+    parser.add_argument("--json", action="store_true", help="打印 JSON 格式结果。")
     args = parser.parse_args()
 
     agent = FinRiskAgent(load_config(args.config))

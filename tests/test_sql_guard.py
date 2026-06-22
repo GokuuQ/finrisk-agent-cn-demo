@@ -9,6 +9,10 @@ def test_select_is_allowed() -> None:
     validate_readonly_sql("SELECT * FROM applications LIMIT 10")
 
 
+def test_readonly_cte_is_allowed() -> None:
+    validate_readonly_sql("WITH base AS (SELECT * FROM applications) SELECT * FROM base")
+
+
 def test_mutation_is_blocked() -> None:
     with pytest.raises(SQLGuardError):
         validate_readonly_sql("DROP TABLE applications")

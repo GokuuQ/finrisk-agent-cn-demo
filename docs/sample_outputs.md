@@ -1,16 +1,16 @@
-# Sample Outputs
+# 样例输出
 
-The following examples are generated from synthetic demo data. They are included so reviewers can understand the expected output shape before running the app.
+以下内容由合成演示数据生成，用于说明项目的输出形态。实际运行时，结果会随数据生成逻辑和配置略有变化。
 
-## Scenario 1: Delinquency Trend
+## 场景一：风险趋势分析
 
-Question:
+问题：
 
 ```text
 分析近6个月M1/M2逾期率变化，并定位主要风险上升客群
 ```
 
-Generated SQL:
+生成 SQL：
 
 ```sql
 SELECT
@@ -32,7 +32,7 @@ HAVING loans >= 20
 ORDER BY apply_month, mob3_m1_rate DESC
 ```
 
-Report excerpt:
+报告片段：
 
 ```text
 核心发现
@@ -42,45 +42,67 @@ Report excerpt:
 - 该分组放款笔数为 25，建议优先关注样本量较大且风险升高的分组。
 ```
 
-## Scenario 2: Strategy Impact
+## 场景二：风控规则挖掘
 
-Question:
+问题：
+
+```text
+挖掘高风险风控规则，按风险提升倍数排序并给出候选规则
+```
+
+输出字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `candidate_rule` | 候选规则描述 |
+| `applications` / `loans` | 命中申请量和放款量 |
+| `mob3_m1_rate` / `mob3_m2_rate` | 规则命中样本的 MOB3 逾期表现 |
+| `mob3_balance` | 规则命中样本的 MOB3 余额 |
+| `risk_lift` | 相对整体 M1 逾期率的风险提升倍数 |
+
+报告片段：
+
+```text
+核心发现
+- 本次挖掘返回若干条候选风控规则，排序依据为风险提升倍数和 MOB3 M1 逾期率。
+- 排名最高的规则包含渠道、风险等级、产品、城市等级和收入带组合。
+- 候选规则不直接等同于生产策略，仍需结合样本稳定性、收益、通过率影响和合规要求进行复核。
+```
+
+## 场景三：策略开发
+
+问题：
+
+```text
+基于近期表现开发准入与额度策略候选方案，输出命中量、风险和建议动作
+```
+
+候选策略类型：
+
+| 策略 | 条件 | 建议动作 |
+| --- | --- | --- |
+| 高风险渠道 D/E 收紧准入 | `channel IN (partner, ad_network) AND risk_grade IN (D, E)` | 拒绝或转人工复核 |
+| 大额低收入客群额度下调 | `income_band=low AND requested_amount>=20000` | 额度上限下调至 12000 |
+| 广告渠道分期产品复核 | `channel=ad_network AND product_type=installment` | 增加二次校验或降低通过阈值 |
+
+报告片段：
+
+```text
+核心发现
+- 本次生成若干条候选策略，覆盖准入收紧、额度下调和人工复核等动作。
+- 每条策略输出命中申请量、当前通过率、MOB3 M1/M2、余额、净收入和已批核敞口。
+- 上线前应做拒绝推断、收益测算和 A/B 或灰度验证。
+```
+
+## 场景四：策略效果评估
+
+问题：
 
 ```text
 评估2025年7月额度策略调整前后的通过率、M1逾期率和收益变化
 ```
 
-Generated SQL:
-
-```sql
-SELECT
-  base.period,
-  COUNT(*) AS applications,
-  ROUND(AVG(base.approved), 4) AS approval_rate,
-  ROUND(AVG(base.booked), 4) AS booking_rate,
-  ROUND(AVG(base.mob3_m1_flag), 4) AS mob3_m1_rate,
-  ROUND(SUM(base.mob3_balance), 2) AS mob3_balance,
-  ROUND(SUM(base.mob3_net_income), 2) AS mob3_net_income
-FROM (
-  SELECT
-    a.app_id,
-    CASE WHEN a.apply_date < '2025-07-01' THEN 'before_policy' ELSE 'after_policy' END AS period,
-    a.approved,
-    CASE WHEN l.loan_id IS NOT NULL THEN 1 ELSE 0 END AS booked,
-    MAX(CASE WHEN mp.mob = 3 THEN mp.m1_flag END) AS mob3_m1_flag,
-    SUM(CASE WHEN mp.mob = 3 THEN mp.balance ELSE 0 END) AS mob3_balance,
-    SUM(CASE WHEN mp.mob = 3 THEN mp.interest_income - mp.credit_loss ELSE 0 END) AS mob3_net_income
-  FROM applications a
-  LEFT JOIN loans l ON a.app_id = l.app_id
-  LEFT JOIN monthly_performance mp ON l.loan_id = mp.loan_id
-  WHERE a.apply_date BETWEEN '2025-04-01' AND '2025-09-30'
-  GROUP BY a.app_id, period, a.approved, booked
-) base
-GROUP BY period
-ORDER BY period
-```
-
-Report excerpt:
+报告片段：
 
 ```text
 核心发现
@@ -89,49 +111,15 @@ Report excerpt:
 - 该分组申请量为 3794，需要结合样本量判断波动是否稳定。
 ```
 
-## Scenario 3: Risk Daily Report
+## 场景五：风险日报
 
-Question:
+问题：
 
 ```text
 生成最近一个月风险日报，说明核心指标、异常波动和建议动作
 ```
 
-Generated SQL:
-
-```sql
-SELECT
-  base.apply_month,
-  base.channel,
-  base.risk_grade,
-  COUNT(*) AS applications,
-  ROUND(AVG(base.approved), 4) AS approval_rate,
-  ROUND(AVG(base.booked), 4) AS booking_rate,
-  ROUND(AVG(base.mob1_m1_flag), 4) AS mob1_m1_rate,
-  ROUND(SUM(base.mob1_balance), 2) AS mob1_balance
-FROM (
-  SELECT
-    a.app_id,
-    substr(a.apply_date, 1, 7) AS apply_month,
-    a.channel,
-    c.risk_grade,
-    a.approved,
-    CASE WHEN l.loan_id IS NOT NULL THEN 1 ELSE 0 END AS booked,
-    MAX(CASE WHEN mp.mob = 1 THEN mp.m1_flag END) AS mob1_m1_flag,
-    SUM(CASE WHEN mp.mob = 1 THEN mp.balance ELSE 0 END) AS mob1_balance
-  FROM applications a
-  JOIN customers c ON a.customer_id = c.customer_id
-  LEFT JOIN loans l ON a.app_id = l.app_id
-  LEFT JOIN monthly_performance mp ON l.loan_id = mp.loan_id
-  WHERE a.apply_date BETWEEN '2025-11-01' AND '2025-11-30'
-  GROUP BY a.app_id, apply_month, a.channel, c.risk_grade, a.approved, booked
-) base
-GROUP BY base.apply_month, base.channel, base.risk_grade
-HAVING applications >= 30
-ORDER BY mob1_m1_rate DESC, applications DESC
-```
-
-Report excerpt:
+报告片段：
 
 ```text
 核心发现

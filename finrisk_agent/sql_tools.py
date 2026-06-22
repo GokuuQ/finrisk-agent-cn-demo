@@ -34,7 +34,7 @@ def validate_readonly_sql(sql: str) -> None:
         "vacuum ",
         "replace ",
     ]
-    if not normalized.startswith("select"):
+    if not (normalized.startswith("select") or normalized.startswith("with")):
         raise SQLGuardError("Only SELECT statements are allowed.")
     if ";" in normalized[:-1]:
         raise SQLGuardError("Multiple SQL statements are not allowed.")
