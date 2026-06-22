@@ -1,0 +1,14 @@
+llm:
+  enabled: false
+  provider: local_openai_compatible
+  base_url: http://localhost:11434/v1
+  model: qwen2.5-coder:7b
+  temperature: 0.1
+  timeout_seconds: 60
+
+database:
+  path: data/finrisk_demo.sqlite
+
+agent:
+  max_rows: 200
+  demo_mode_notice: true
