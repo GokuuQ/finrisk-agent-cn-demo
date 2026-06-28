@@ -8,7 +8,7 @@
 
 ## 核心能力
 
-MVP 规划包含三个完整 Skill：
+当前提供一个简洁离线 MVP，包含三个可直接 import 的 Skill：
 
 | Skill | 目标 |
 | --- | --- |
@@ -16,7 +16,7 @@ MVP 规划包含三个完整 Skill：
 | `RuleMiningSkill` | 单变量阈值规则、分类规则、缺失规则、双变量 AND、分月验证、Train/Test 验证、Python/SQL 导出 |
 | `ModelEvaluationSkill` | 已有模型分数评估、AUC/KS/Lift、分数分箱、分月/分群/分集合评估、PSI、校准和稳定性报告 |
 
-当前已完成 Phase 0：项目骨架、核心异常、`SkillResult`、`BaseRiskSkill`、配置加载器、日志工具、版本信息、打包配置和最小测试。指标、分箱和三个业务 Skill 会在后续 Phase 中逐步实现。
+当前已完成核心指标、分箱、Excel/Markdown 导出和三个业务 Skill 的基础闭环。实现重点是封闭环境可用、代码简洁、对宽表友好：可通过 `features.include` 精确指定变量，也可通过 `analysis.max_features` / `mining.max_features` 限制自动扫描规模，避免上百变量场景下候选规则或输出文件失控。
 
 ## 安装
 
@@ -46,11 +46,16 @@ python3 -m pip install -r requirements-optional.txt
 
 ## 快速开始
 
-Phase 0 阶段可验证包导入和统一 Skill 生命周期：
+验证包导入、测试和离线 demo：
 
 ```bash
 python3 -c "import risk_skills; print(risk_skills.__version__)"
 python3 -m pytest -q
+
+python3 examples/generate_demo_data.py
+python3 examples/run_variable_analysis.py
+python3 examples/run_rule_mining.py
+python3 examples/run_model_evaluation.py
 ```
 
 自定义 Skill 可继承 `BaseRiskSkill`：
@@ -77,7 +82,7 @@ print(result.summary)
 
 ## 三个 Skill 示例
 
-以下 API 是 MVP 的目标接口，具体实现会在后续阶段补齐：
+三个 Skill 都已经可以在本地 DataFrame 上运行：
 
 ```python
 from risk_skills.skills import (
@@ -87,7 +92,7 @@ from risk_skills.skills import (
 )
 ```
 
-变量分析目标用法：
+变量分析用法：
 
 ```python
 skill = VariableAnalysisSkill(config={
@@ -99,7 +104,7 @@ skill = VariableAnalysisSkill(config={
 result = skill.run(df)
 ```
 
-规则挖掘目标用法：
+规则挖掘用法：
 
 ```python
 skill = RuleMiningSkill(config={
@@ -112,7 +117,7 @@ skill = RuleMiningSkill(config={
 result = skill.run(df)
 ```
 
-模型评估目标用法：
+模型评分评估用法：
 
 ```python
 skill = ModelEvaluationSkill(config={
@@ -206,6 +211,9 @@ python3 -m pytest -q
 - `risk_skills` 包导入与版本
 - 配置加载、深度合并、目标和特征规格构建
 - `BaseRiskSkill` 生命周期、metadata、export 开关和错误阶段定位
+- AUC、KS、IV/WOE、Lift、PSI、Wilson 区间等原子指标
+- 数值/分类分箱 transformer 不丢样本
+- 变量分析、规则挖掘、模型评分评估在宽表样本上的最小闭环
 - 早期 `finrisk_agent` 只读 SQL guard 回归测试
 
 ## 项目结构
@@ -214,16 +222,20 @@ python3 -m pytest -q
 .
 ├── src/risk_skills/
 │   ├── core/              # BaseRiskSkill、SkillResult、配置、异常、注册表
-│   ├── data/              # 数据校验、样本和成熟度能力，后续实现
-│   ├── metrics/           # AUC、KS、IV、Lift、PSI 等原子指标，后续实现
-│   ├── binning/           # 数值/分类/手动分箱和 transformer，后续实现
-│   ├── variable/          # 变量分析底层模块，后续实现
-│   ├── strategy/          # 规则挖掘底层模块，后续实现
-│   ├── model/             # 模型分数评估模块，后续实现
-│   ├── report/            # Excel、Markdown、图表导出，后续实现
-│   ├── skills/            # 三个 public Skill 入口，后续实现
+│   ├── data/              # 宽表变量推断、类型识别和质量画像
+│   ├── metrics/           # AUC、KS、IV、Lift、PSI、Brier、Wilson 区间
+│   ├── binning/           # 数值/分类分箱和 BinTransformer
+│   ├── variable/          # 变量分析底层模块
+│   ├── strategy/          # 规则对象、导出和受控规则挖掘
+│   ├── model/             # 已有模型评分评估
+│   ├── report/            # Excel、Markdown 导出
+│   ├── skills/            # VariableAnalysisSkill、RuleMiningSkill、ModelEvaluationSkill
 │   └── utils/             # 日志、时间、序列化、可选依赖工具
 ├── tests/test_core/       # Phase 0 单元测试
+├── tests/test_metrics/    # 指标测试
+├── tests/test_binning/    # 分箱测试
+├── tests/test_skills/     # 三个 Skill 的宽表闭环测试
+├── examples/              # 可复现 demo 数据和运行脚本
 ├── finrisk_agent/         # 早期 SQL 演示 Agent，保留兼容
 ├── scripts/               # 早期演示数据脚本
 ├── docs/                  # 早期演示文档
@@ -246,13 +258,9 @@ python3 -m finrisk_agent.cli "挖掘高风险风控规则，按风险提升倍�
 
 开发顺序按阶段推进：
 
-1. Phase 0：项目骨架和核心对象，已完成。
-2. Phase 1：原子指标，AUC、KS、IV/WOE、Lift、PSI、Brier、Wilson 区间。
-3. Phase 2：分箱，数值等频/等距/手动、分类稀有合并、缺失和特殊值、BinTransformer。
-4. Phase 3：`VariableAnalysisSkill`。
-5. Phase 4：`RuleMiningSkill`。
-6. Phase 5：`ModelEvaluationSkill`。
-7. Phase 6：文档、Notebook、Demo 数据、输出字段字典和离线安装说明完善。
+1. 已完成：项目骨架、核心对象、原子指标、分箱、三个 Skill 的离线 MVP、demo 数据和基础报告。
+2. 下一步：增强分月/分群稳定性、Train/Test/OOT 衰减、规则去重、更多报告字段和图表。
+3. 后续：监控、策略模拟、利润测算、模型开发和可选 LLM 报告润色。
 
 后续可扩展 `StrategySimulationSkill`、`ModelDevelopmentSkill`、`MonitoringSkill`、`ProfitSimulationSkill` 和可选 LLM Adapter。LLM 只用于结构化结果解释和报告润色，不参与底层指标计算。
 

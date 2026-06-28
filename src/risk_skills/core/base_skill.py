@@ -80,16 +80,17 @@ class BaseRiskSkill(object):
             if summary is not None:
                 result.summary = summary
 
+            result.status = result.status or "success"
+            result.warnings.extend([w for w in self.warnings if w not in result.warnings])
+            self._finish_metadata(run_metadata, start, data)
+            result.metadata.update(run_metadata.to_dict())
+
             if self._output_enabled():
                 self._log("INFO", "export", "exporting result")
                 self._current_stage = "export"
                 exports = self.export(result) or {}
                 result.exports.update(exports)
 
-            result.status = result.status or "success"
-            result.warnings.extend([w for w in self.warnings if w not in result.warnings])
-            self._finish_metadata(run_metadata, start, data)
-            result.metadata.update(run_metadata.to_dict())
             self.metadata = result.metadata
             self.result = result
             self._log("INFO", "complete", "skill run completed")
