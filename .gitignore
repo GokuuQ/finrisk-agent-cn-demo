@@ -5,5 +5,9 @@ __pycache__/
 config.yaml
 data/*.sqlite
 data/*.db
+data/*.csv
 outputs/
+output/*
+!output/.gitkeep
 .pytest_cache/
+*.egg-info/
