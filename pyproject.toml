@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "risk-skills"
+version = "0.1.0"
+description = "Offline-first risk analysis skills toolkit for consumer finance workflows."
+readme = "README.md"
+requires-python = ">=3.8,<3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "risk-skills contributors" }
+]
+keywords = ["risk", "credit", "finance", "analytics", "scorecard"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Financial and Insurance Industry",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = []
+
+[project.optional-dependencies]
+core = [
+  "pandas>=1.3",
+  "numpy>=1.20",
+  "scipy>=1.6",
+  "scikit-learn>=0.24",
+  "matplotlib>=3.3",
+  "openpyxl>=3.0",
+]
+yaml = ["PyYAML>=5.4"]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-q"

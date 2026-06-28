@@ -1,139 +1,261 @@
-# 消费金融风控分析智能体演示项目
+# risk-skills
 
-> 一个面向封闭环境的消费金融风控数据分析智能体公开演示项目。
+> 面向消费金融、互联网小额信贷、联合贷和营销前筛场景的离线风控分析工具包。
 
-本项目是公开展示用演示项目，不包含任何真实业务数据、客户信息、内部策略或生产模型。所有数据均由脚本合成生成，用于展示在金融机构常见的封闭数据环境中，如何用本地国产开源模型、本地数据库和受控工具调用，完成“风险分析、规则挖掘、策略开发、报告生成”的可审计工作流。
+`risk-skills` 的目标是沉淀一套可在封闭环境运行、低依赖、可复用、可验证的 Python 风控 Skill 基础设施。它不是依赖大模型完成计算的 Agent，也不是只能跑一次的 Notebook 脚本；核心计算会以独立 Python package 的方式提供，并通过统一配置和统一结果对象输出可追溯报告。
 
-## 项目定位
+当前仓库同时保留了早期 `finrisk_agent` SQLite 演示项目，用于展示自然语言到只读 SQL 的封闭环境工作流。新开发的工具包位于 [src/risk_skills](/Users/chao/Documents/risk/src/risk_skills)。
 
-消费金融风控分析通常具有指标口径复杂、数据链路长、策略结果需要可解释、数据不能出域等特点。本演示项目将智能体约束在本地环境中，让它围绕合成信贷数据完成以下任务：
+## 核心能力
 
-1. 理解自然语言分析问题
-2. 生成只读 SQL 分析计划
-3. 校验 SQL 安全性
-4. 在本地 SQLite 数据库执行分析
-5. 挖掘高风险规则和候选策略
-6. 输出风险发现、策略建议和可复核报告
+MVP 规划包含三个完整 Skill：
 
-## 核心功能
-
-| 功能 | 说明 | 示例问题 |
-| --- | --- | --- |
-| 风险趋势分析 | 按月份、渠道、风险等级、产品类型分析 M1/M2 逾期趋势 | 分析近6个月M1/M2逾期率变化，并定位主要风险上升客群 |
-| 风控规则挖掘 | 按渠道、风险等级、产品、城市等级、收入带挖掘高风险规则，并计算风险提升倍数 | 挖掘高风险风控规则，按风险提升倍数排序并给出候选规则 |
-| 策略开发 | 生成准入收紧、额度下调、人工复核等候选策略，并评估命中量、风险和敞口 | 基于近期表现开发准入与额度策略候选方案，输出命中量、风险和建议动作 |
-| 策略效果评估 | 对比策略调整前后的通过率、放款率、MOB3 M1、余额和净收入 | 评估2025年7月额度策略调整前后的通过率、M1逾期率和收益变化 |
-| 风险日报 | 生成最近月份的渠道和风险等级拆解报告 | 生成最近一个月风险日报，说明核心指标、异常波动和建议动作 |
-
-完整演示输出见 [docs/sample_outputs.md](docs/sample_outputs.md)。
-
-## 封闭环境架构
-
-```mermaid
-flowchart LR
-    User["用户问题"] --> Agent["智能体编排器"]
-    Agent --> Planner["任务规划<br/>本地模型 JSON 或内置模板"]
-    Planner --> Guard["SQL 安全校验<br/>只读查询"]
-    Guard --> DB["本地 SQLite 演示库"]
-    DB --> Metrics["指标整理<br/>风险分群 / 规则风险提升倍数 / 策略敞口"]
-    Metrics --> Report["分析报告"]
-    Agent --> LLM["可选本地大模型<br/>Qwen / GLM / DeepSeek"]
-    LLM --> Planner
-```
-
-封闭环境设计要点：
-
-- 分析过程不依赖外部数据访问。
-- 默认模式不要求模型服务，可以用内置模板跑通完整演示。
-- 如果配置本地模型，可接入 Ollama、llama.cpp、vLLM、Xinference 或任意兼容 OpenAI 接口的本地服务。
-- SQL 执行前会做只读校验，阻断写入、删除、建表等操作。
-- 数据由本地脚本生成，完全合成，不复刻任何真实资产组合。
-
-## 合成数据模型
-
-演示数据库包含五张表：
-
-| 表名 | 用途 |
+| Skill | 目标 |
 | --- | --- |
-| `customers` | 合成客户画像，包括年龄段、城市等级、风险等级、收入带 |
-| `applications` | 信贷申请信息，包括申请日期、渠道、产品、申请金额、审批结果 |
-| `loans` | 放款信息，包括本金、期限、利率 |
-| `monthly_performance` | MOB 表现，包括余额、M1/M2 标记、利息收入、信用损失 |
-| `strategy_events` | 策略事件说明，例如 2025 年 7 月额度策略调整 |
+| `VariableAnalysisSkill` | 数据质量、变量画像、分箱、IV/KS/AUC/Lift、PSI、方向、评级、Excel/Markdown 报告 |
+| `RuleMiningSkill` | 单变量阈值规则、分类规则、缺失规则、双变量 AND、分月验证、Train/Test 验证、Python/SQL 导出 |
+| `ModelEvaluationSkill` | 已有模型分数评估、AUC/KS/Lift、分数分箱、分月/分群/分集合评估、PSI、校准和稳定性报告 |
 
-数据生成逻辑保留了渠道质量差异、风险等级梯度、大额低收入风险、策略调整前后变化等特征，用于演示风控规则挖掘和策略开发流程。
+当前已完成 Phase 0：项目骨架、核心异常、`SkillResult`、`BaseRiskSkill`、配置加载器、日志工具、版本信息、打包配置和最小测试。指标、分箱和三个业务 Skill 会在后续 Phase 中逐步实现。
 
-## 本地模型适配
+## 安装
 
-项目不绑定具体模型，只要求本地服务兼容 OpenAI Chat Completions 接口。适合在封闭环境中演示的国产开源模型包括：
-
-- `Qwen2.5-Coder-7B-Instruct` / `Qwen2.5-Coder-14B-Instruct`
-- `Qwen3-8B` / `Qwen3-14B`
-- `GLM-4-9B` / `GLM-Z1-9B`
-- `DeepSeek-R1-Distill-Qwen-7B` / `DeepSeek-R1-Distill-Qwen-14B`
-
-没有本地模型时，将 `llm.enabled` 设置为 `false`，演示项目会使用内置规划模板。
-
-## 运行方式
+开发安装：
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-python scripts/generate_demo_data.py
-streamlit run app.py
+python3 -m pip install -e .
 ```
 
-命令行模式：
+核心计算依赖安装：
 
 ```bash
-python -m finrisk_agent.cli "挖掘高风险风控规则，按风险提升倍数排序并给出候选规则" --show-sql
+python3 -m pip install -r requirements-core.txt
 ```
 
-完整演示流程见 [docs/demo_walkthrough.md](docs/demo_walkthrough.md)。
-
-## 本地模型配置
-
-复制配置样例：
+开发测试依赖安装：
 
 ```bash
-cp config.example.yaml config.yaml
+python3 -m pip install -r requirements-dev.txt
 ```
 
-本地兼容 OpenAI 接口服务配置示例：
+可选依赖安装：
 
-```yaml
-llm:
-  enabled: true
-  provider: local_openai_compatible
-  base_url: http://localhost:11434/v1
-  model: qwen2.5-coder:7b
-  temperature: 0.1
-  timeout_seconds: 60
+```bash
+python3 -m pip install -r requirements-optional.txt
 ```
+
+## 快速开始
+
+Phase 0 阶段可验证包导入和统一 Skill 生命周期：
+
+```bash
+python3 -c "import risk_skills; print(risk_skills.__version__)"
+python3 -m pytest -q
+```
+
+自定义 Skill 可继承 `BaseRiskSkill`：
+
+```python
+from risk_skills.core import BaseRiskSkill, SkillResult
+
+
+class DummySkill(BaseRiskSkill):
+    skill_name = "dummy"
+    skill_version = "0.1.0"
+
+    def validate_input(self, data):
+        if data is None:
+            raise ValueError("data is required")
+
+    def run_analysis(self, data):
+        return SkillResult(status="success", summary={"rows": len(data)})
+
+
+result = DummySkill(config={"output": {"enabled": False}}).run([1, 2, 3])
+print(result.summary)
+```
+
+## 三个 Skill 示例
+
+以下 API 是 MVP 的目标接口，具体实现会在后续阶段补齐：
+
+```python
+from risk_skills.skills import (
+    VariableAnalysisSkill,
+    RuleMiningSkill,
+    ModelEvaluationSkill,
+)
+```
+
+变量分析目标用法：
+
+```python
+skill = VariableAnalysisSkill(config={
+    "data": {"id_col": "cust_id", "time_col": "loan_month"},
+    "targets": [{"name": "fpd7", "target_col": "fpd7", "observe_col": "can_7"}],
+    "features": {"include": ["query_count_30d", "credit_score", "device_risk"]},
+    "output": {"enabled": True, "directory": "output/variable_analysis"},
+})
+result = skill.run(df)
+```
+
+规则挖掘目标用法：
+
+```python
+skill = RuleMiningSkill(config={
+    "data": {"time_col": "loan_month", "split_col": "split"},
+    "targets": [{"name": "fpd7", "target_col": "fpd7", "observe_col": "can_7"}],
+    "features": {"include": ["query_count_30d", "credit_score", "device_risk"]},
+    "mining": {"min_hit_rate": 0.01, "max_hit_rate": 0.30, "min_lift": 1.30},
+    "output": {"enabled": True, "directory": "output/rule_mining"},
+})
+result = skill.run(df)
+```
+
+模型评估目标用法：
+
+```python
+skill = ModelEvaluationSkill(config={
+    "data": {"time_col": "loan_month", "segment_cols": ["channel"], "split_col": "split"},
+    "target": {"name": "fpd7", "target_col": "fpd7", "observe_col": "can_7"},
+    "score": {"score_col": "model_score", "higher_score_higher_risk": True, "bins": 10},
+    "output": {"enabled": True, "directory": "output/model_evaluation"},
+})
+result = skill.run(df)
+```
+
+## 配置说明
+
+配置支持三种形式：
+
+- Python `dict`
+- JSON 文件
+- YAML 文件，安装 `PyYAML` 后启用
+
+优先级：
+
+```text
+显式函数参数 > config dict > JSON/YAML 配置 > 默认值
+```
+
+业务字段、标签口径、变量列表、特殊值、输出路径和随机种子都应通过配置传入，不在底层函数中硬编码。
+
+## 输出说明
+
+所有 Skill 最终都应返回 `SkillResult`：
+
+```text
+status
+summary
+details
+charts
+exports
+warnings
+recommendations
+metadata
+error
+```
+
+运行元数据会包含包版本、Skill 名称、运行 ID、开始/结束时间、耗时、Python 版本、样本行列数、配置摘要和随机种子。报告模块只消费结构化结果，不在 Excel/Markdown 导出阶段重新计算指标。
+
+## 兼容性
+
+目标 Python 版本：
+
+```text
+Python 3.8 - 3.11
+```
+
+核心依赖目标范围：
+
+```text
+pandas >= 1.3
+numpy >= 1.20
+scipy >= 1.6
+scikit-learn >= 0.24
+matplotlib >= 3.3
+openpyxl >= 3.0
+```
+
+`xgboost`、`lightgbm`、`shap`、`optuna`、`PyYAML` 都是可选依赖。缺失可选依赖时，核心 package 仍应可导入。
+
+## 离线环境安装
+
+在可联网机器上下载 wheels：
+
+```bash
+python3 -m pip download -r requirements-core.txt -d wheels/
+python3 -m pip download . -d wheels/
+```
+
+在离线环境中安装：
+
+```bash
+python3 -m pip install --no-index --find-links=wheels/ -r requirements-core.txt
+python3 -m pip install --no-index --find-links=wheels/ .
+```
+
+## 测试
+
+```bash
+python3 -m pytest -q
+```
+
+当前测试覆盖：
+
+- `risk_skills` 包导入与版本
+- 配置加载、深度合并、目标和特征规格构建
+- `BaseRiskSkill` 生命周期、metadata、export 开关和错误阶段定位
+- 早期 `finrisk_agent` 只读 SQL guard 回归测试
 
 ## 项目结构
 
 ```text
 .
-├── app.py                         # 中文演示页面
-├── config.example.yaml            # 本地模型配置样例
-├── data/                          # 本地生成的合成演示数据
-├── docs/
-│   ├── demo_walkthrough.md         # 中文演示流程
-│   └── sample_outputs.md           # 样例 SQL 与报告输出
-├── finrisk_agent/
-│   ├── agent.py                    # 智能体编排
-│   ├── cli.py                      # 命令行入口
-│   ├── llm.py                      # 本地模型客户端
-│   ├── planner.py                  # 任务规划与内置模板
-│   ├── reporting.py                # 报告生成
-│   └── sql_tools.py                # 只读 SQL 执行与安全校验
-├── scripts/generate_demo_data.py   # 合成信贷数据生成脚本
-└── tests/                          # SQL 安全校验测试
+├── src/risk_skills/
+│   ├── core/              # BaseRiskSkill、SkillResult、配置、异常、注册表
+│   ├── data/              # 数据校验、样本和成熟度能力，后续实现
+│   ├── metrics/           # AUC、KS、IV、Lift、PSI 等原子指标，后续实现
+│   ├── binning/           # 数值/分类/手动分箱和 transformer，后续实现
+│   ├── variable/          # 变量分析底层模块，后续实现
+│   ├── strategy/          # 规则挖掘底层模块，后续实现
+│   ├── model/             # 模型分数评估模块，后续实现
+│   ├── report/            # Excel、Markdown、图表导出，后续实现
+│   ├── skills/            # 三个 public Skill 入口，后续实现
+│   └── utils/             # 日志、时间、序列化、可选依赖工具
+├── tests/test_core/       # Phase 0 单元测试
+├── finrisk_agent/         # 早期 SQL 演示 Agent，保留兼容
+├── scripts/               # 早期演示数据脚本
+├── docs/                  # 早期演示文档
+└── output/                # Skill 输出目录
 ```
 
-## 安全边界
+## 旧演示项目
 
-本项目仅用于公开演示和作品集展示，不提供授信决策、投资建议、监管建议或生产风控策略。所有数据均为合成数据，所有规则和策略仅用于说明方法。
+早期演示项目仍可按原方式运行：
+
+```bash
+python3 scripts/generate_demo_data.py
+streamlit run app.py
+python3 -m finrisk_agent.cli "挖掘高风险风控规则，按风险提升倍数排序并给出候选规则" --show-sql
+```
+
+这部分代码用于展示本地 SQLite、只读 SQL 校验和封闭环境分析报告；它不会作为新 `risk_skills` 核心计算层的依赖。
+
+## 路线图
+
+开发顺序按阶段推进：
+
+1. Phase 0：项目骨架和核心对象，已完成。
+2. Phase 1：原子指标，AUC、KS、IV/WOE、Lift、PSI、Brier、Wilson 区间。
+3. Phase 2：分箱，数值等频/等距/手动、分类稀有合并、缺失和特殊值、BinTransformer。
+4. Phase 3：`VariableAnalysisSkill`。
+5. Phase 4：`RuleMiningSkill`。
+6. Phase 5：`ModelEvaluationSkill`。
+7. Phase 6：文档、Notebook、Demo 数据、输出字段字典和离线安装说明完善。
+
+后续可扩展 `StrategySimulationSkill`、`ModelDevelopmentSkill`、`MonitoringSkill`、`ProfitSimulationSkill` 和可选 LLM Adapter。LLM 只用于结构化结果解释和报告润色，不参与底层指标计算。
+
+## 免责声明
+
+本项目用于风控分析、研究和辅助决策，不应在缺少人工审查、合规评估和业务验证的情况下直接用于自动化信贷决策。仓库中的演示数据均为合成数据，不包含真实客户信息、内部策略或生产模型。

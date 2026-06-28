@@ -1,0 +1,6 @@
+PyYAML>=5.4
+joblib>=1.0
+xgboost>=0.90
+lightgbm>=3.0
+shap>=0.40
+optuna>=3.0

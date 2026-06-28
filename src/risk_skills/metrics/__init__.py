@@ -1,0 +1,1 @@
+"""Atomic metric functions."""

@@ -7,3 +7,4 @@ data/*.sqlite
 data/*.db
 outputs/
 .pytest_cache/
+*.egg-info/
